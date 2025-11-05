@@ -116,7 +116,17 @@ static void ch341_spi_set_cs(struct spi_device *spi, bool active)
 
 	if (spi->mode & SPI_NO_CS)
 		return;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+	if (spi->chip_select[0] > CH341_SPI_MAX_NUM_DEVICES) {
+		DEV_ERR(CH34X_USBDEV, "invalid CS value %d, 0~%d are available", spi->chip_select[0],
+			CH341_SPI_MAX_NUM_DEVICES - 1);
+	}
 
+	if (active)
+		ch34x_dev->gpio_io_data &= ~(1 << spi->chip_select[0]);
+	else
+		ch34x_dev->gpio_io_data |= (1 << spi->chip_select[0]);
+#else
 	if (spi->chip_select > CH341_SPI_MAX_NUM_DEVICES) {
 		DEV_ERR(CH34X_USBDEV, "invalid CS value %d, 0~%d are available", spi->chip_select,
 			CH341_SPI_MAX_NUM_DEVICES - 1);
@@ -126,6 +136,7 @@ static void ch341_spi_set_cs(struct spi_device *spi, bool active)
 		ch34x_dev->gpio_io_data &= ~(1 << spi->chip_select);
 	else
 		ch34x_dev->gpio_io_data |= (1 << spi->chip_select);
+#endif
 
 	ch341_spi_update_io_data(ch34x_dev);
 }
@@ -413,7 +424,17 @@ static bool ch347_spi_set_cs(struct spi_device *spi, bool active)
 
 	if (spi->mode & SPI_NO_CS)
 		return true;
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+	if (spi->chip_select[0] > CH347_SPI_MAX_NUM_DEVICES) {
+		DEV_ERR(CH34X_USBDEV, "invalid CS value %d, 0~%d are available", spi->chip_select[0],
+			CH341_SPI_MAX_NUM_DEVICES - 1);
+	}
 
+	if (spi->chip_select[0] == 0)
+		ch34x_dev->spicfg.ics = 0x80;
+	else
+		ch34x_dev->spicfg.ics = 0x80 << 8;
+#else
 	if (spi->chip_select > CH347_SPI_MAX_NUM_DEVICES) {
 		DEV_ERR(CH34X_USBDEV, "invalid CS value %d, 0~%d are available", spi->chip_select,
 			CH341_SPI_MAX_NUM_DEVICES - 1);
@@ -423,7 +444,7 @@ static bool ch347_spi_set_cs(struct spi_device *spi, bool active)
 		ch34x_dev->spicfg.ics = 0x80;
 	else
 		ch34x_dev->spicfg.ics = 0x80 << 8;
-
+#endif
 	return ch347spi_change_cs(ch34x_dev, active ? 0x00 : 0x01);
 }
 
@@ -805,7 +826,11 @@ static int ch347_spi_transfer_one_message(struct spi_controller *ctlr, struct sp
 				goto out;
 			}
 		}
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+		if (msg->spi->chip_select[0] == 0) {
+#else
 		if (msg->spi->chip_select == 0) {
+#endif
 			ch34x_dev->bulkout_buf[1] = (u8)(bytes_to_xfer - USB20_CMD_HEADER);
 			ch34x_dev->bulkout_buf[2] = (u8)((bytes_to_xfer - USB20_CMD_HEADER) >> 8) | BIT(7) | BIT(6);
 		} else {
@@ -907,7 +932,11 @@ out:
 static int ch341_spi_setup(struct spi_device *spi)
 {
 	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->controller);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+	u8 cs_mask = (1 << spi->chip_select[0]);
+#else
 	u8 cs_mask = (1 << spi->chip_select);
+#endif
 
 	mutex_lock(&ch34x_dev->io_mutex);
 
@@ -948,6 +977,25 @@ static int ch347_spi_setup(struct spi_device *spi)
 		return -EINVAL;
 #endif
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+	if (spi->chip_select[0] == 1) {
+		if (ch34x_dev->chiptype == CHIP_CH347F) {
+			if (!ch347_func_switch(ch34x_dev, 0)) {
+				DEV_ERR(CH34X_USBDEV, "Failed to init SPI1 CS1 of CH347F.");
+				return -EPROTO;
+			}
+		}
+	}
+	mutex_lock(&ch34x_dev->io_mutex);
+	if (spi->chip_select[0] == 0)
+		spicfg.ics = 0x80;
+	else if (spi->chip_select[0] == 1)
+		spicfg.ics = 0x80 << 8;
+	else {
+		ret = -EINVAL;
+		goto exit;
+	}
+#else
 	if (spi->chip_select == 1) {
 		if (ch34x_dev->chiptype == CHIP_CH347F) {
 			if (!ch347_func_switch(ch34x_dev, 0)) {
@@ -965,6 +1013,7 @@ static int ch347_spi_setup(struct spi_device *spi)
 		ret = -EINVAL;
 		goto exit;
 	}
+#endif
 
 	switch (spi->mode) {
 	case SPI_MODE_0:
@@ -1025,6 +1074,19 @@ static int ch347_spi_setup(struct spi_device *spi)
 		spicfg.ibyteorder = 1;
 
 	/* BIT0：CS0/1 polar control, 0：low active, 1：high active */
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 8, 0)
+	if (spi->mode & SPI_CS_HIGH) {
+		if (spi->chip_select[0] == 0)
+			spicfg.cs0_polar = 1;
+		else
+			spicfg.cs1_polar = 1;
+	} else {
+		if (spi->chip_select[0] == 0)
+			spicfg.cs0_polar = 0;
+		else
+			spicfg.cs1_polar = 0;
+	}
+#else
 	if (spi->mode & SPI_CS_HIGH) {
 		if (spi->chip_select == 0)
 			spicfg.cs0_polar = 1;
@@ -1036,6 +1098,7 @@ static int ch347_spi_setup(struct spi_device *spi)
 		else
 			spicfg.cs1_polar = 0;
 	}
+#endif
 
 	/* spi output [0xFF] by default */
 	spicfg.ispi_out_def = 0xFF;

@@ -545,7 +545,7 @@ int ch34x_mphsi_gpio_probe(struct ch34x_device *ch34x_dev)
 			DEV_ERR(CH34X_USBDEV, "Failed to allocate pin %d\n", gpio->base + j);
 			return result;
 		}
-		result = gpio_export(gpio->base + i, true);
+		result = gpiod_export(gpio_to_desc(gpio->base + i), true);
 		if (result) {
 			DEV_ERR(CH34X_USBDEV, "failed to export gpio pin %d", gpio->base + i);
 			/* reduce number of GPIOs to avoid crashes during free in case of error */
