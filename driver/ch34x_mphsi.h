@@ -155,7 +155,7 @@
 #define GPIO_ENABLE  BIT(7)
 #define GPIO_DIR_SET BIT(6)
 
-#define ch34x_spi_maser_to_dev(m) *((struct ch34x_device **)spi_master_get_devdata(m))
+#define ch34x_spi_maser_to_dev(m) *((struct ch34x_device **)spi_controller_get_devdata(m))
 
 #ifndef USB_DEVICE_INTERFACE_NUMBER
 #define USB_DEVICE_INTERFACE_NUMBER(vend, prod, num)                                                    \
@@ -264,7 +264,7 @@ struct ch34x_device {
 
 	struct urb *intr_urb;
 
-	struct spi_master *master;
+	struct spi_controller *master;
 	struct spi_device *slaves[CH341_SPI_MAX_NUM_DEVICES];
 	int slave_num;
 	bool last_cpol; /* last message CPOL */

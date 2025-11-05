@@ -19,7 +19,7 @@
 
 #define SPI_DMA_XFER 0
 
-#define ch34x_spi_maser_to_dev(m) *((struct ch34x_device **)spi_master_get_devdata(m))
+#define ch34x_spi_maser_to_dev(m) *((struct ch34x_device **)spi_controller_get_devdata(m))
 
 static int param_bus_num = -1;
 module_param_named(spi_bus_num, param_bus_num, int, 0600);
@@ -112,7 +112,7 @@ static void ch341_spi_update_io_data(struct ch34x_device *ch34x_dev)
 
 static void ch341_spi_set_cs(struct spi_device *spi, bool active)
 {
-	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->master);
+	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->controller);
 
 	if (spi->mode & SPI_NO_CS)
 		return;
@@ -409,7 +409,7 @@ bool ch347spi_change_cs(struct ch34x_device *ch34x_dev, u8 istatus)
 
 static bool ch347_spi_set_cs(struct spi_device *spi, bool active)
 {
-	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->master);
+	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->controller);
 
 	if (spi->mode & SPI_NO_CS)
 		return true;
@@ -683,7 +683,7 @@ static int ch34x_spi_transfer_one(struct ch34x_device *ch34x_dev, struct spi_dev
 	return result;
 }
 
-static int ch341_spi_transfer_one_message(struct spi_master *ctlr, struct spi_message *msg)
+static int ch341_spi_transfer_one_message(struct spi_controller *ctlr, struct spi_message *msg)
 {
 	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(ctlr);
 	struct spi_transfer *xfer;
@@ -761,7 +761,7 @@ static int ch347_spi_build_packet(struct ch34x_device *ch34x_dev, struct spi_dev
 	return len;
 }
 
-static int ch347_spi_transfer_one_message(struct spi_master *ctlr, struct spi_message *msg)
+static int ch347_spi_transfer_one_message(struct spi_controller *ctlr, struct spi_message *msg)
 {
 	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(ctlr);
 	struct spi_transfer *xfer;
@@ -906,7 +906,7 @@ out:
 
 static int ch341_spi_setup(struct spi_device *spi)
 {
-	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->master);
+	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->controller);
 	u8 cs_mask = (1 << spi->chip_select);
 
 	mutex_lock(&ch34x_dev->io_mutex);
@@ -923,8 +923,8 @@ static int ch341_spi_setup(struct spi_device *spi)
 
 static int ch347_spi_setup(struct spi_device *spi)
 {
-	struct spi_master *master = spi->master;
-	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->master);
+	struct spi_controller *master = spi->controller;
+	struct ch34x_device *ch34x_dev = ch34x_spi_maser_to_dev(spi->controller);
 	mspi_cfgs spicfg = { 0 };
 	u8 scale;
 	int ret;
@@ -1100,7 +1100,7 @@ int ch34x_spi_probe(struct ch34x_device *ch34x_dev)
 		ch34x_dev->master->num_chipselect = CH347_SPI_MAX_NUM_DEVICES;
 	ch34x_dev->master->mode_bits = SPI_MODE_3 | SPI_LSB_FIRST | SPI_CS_HIGH;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 15, 0)
-	ch34x_dev->master->flags = SPI_MASTER_MUST_RX | SPI_MASTER_MUST_TX;
+	ch34x_dev->master->flags = SPI_CONTROLLER_MUST_RX | SPI_CONTROLLER_MUST_TX;
 #endif
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 0, 0)
@@ -1126,9 +1126,9 @@ int ch34x_spi_probe(struct ch34x_device *ch34x_dev)
 	}
 
 	/* register spi master */
-	if ((result = spi_register_master(ch34x_dev->master))) {
+	if ((result = spi_register_controller(ch34x_dev->master))) {
 		DEV_ERR(CH34X_USBDEV, "could not register SPI master");
-		spi_master_put(ch34x_dev->master);
+		spi_controller_put(ch34x_dev->master);
 		ch34x_dev->master = 0;
 		return result;
 	}
@@ -1173,7 +1173,7 @@ void ch34x_spi_remove(struct ch34x_device *ch34x_dev)
 #endif
 
 	if (ch34x_dev->master)
-		spi_unregister_master(ch34x_dev->master);
+		spi_unregister_controller(ch34x_dev->master);
 
 	return;
 }
