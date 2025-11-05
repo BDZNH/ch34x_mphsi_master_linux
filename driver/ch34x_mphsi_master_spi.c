@@ -1081,7 +1081,7 @@ int ch34x_spi_probe(struct ch34x_device *ch34x_dev)
 	DEV_DBG(CH34X_USBDEV, "start");
 
 	/* allocate a new SPI master with a pointer to ch34x_device as device data */
-	ch34x_dev->master = spi_alloc_master(CH34X_USBDEV, sizeof(struct ch34x_device *));
+	ch34x_dev->master = spi_alloc_host(CH34X_USBDEV, sizeof(struct ch34x_device *));
 	if (!ch34x_dev->master) {
 		DEV_ERR(CH34X_USBDEV, "SPI master allocation failed");
 		return -ENOMEM;
