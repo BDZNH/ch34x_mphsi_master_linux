@@ -3,6 +3,8 @@ CONFIG_MODULE_SIG=n
 DRIVERNAME := ch34x_mphsi_master
 all : modules
 
+ccflags-y += -Wno-missing-prototypes -Wno-missing-declarations
+
 ifneq ($(KERNELRELEASE),)
 obj-m += $(DRIVERNAME).o
 $(DRIVERNAME)-y := ch34x_mphsi_master_usb.o ch34x_mphsi_master_spi.o ch34x_mphsi_master_i2c.o ch34x_mphsi_master_gpio.o
